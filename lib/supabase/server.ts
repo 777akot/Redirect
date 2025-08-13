@@ -1,5 +1,4 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
-import { cache } from "react"
 
 // Check if Supabase environment variables are available
 export const isSupabaseConfigured =
@@ -66,7 +65,7 @@ export async function ensureTablesExist() {
   }
 }
 
-export const createClient = cache(() => {
+export function createClient() {
   if (!isSupabaseConfigured) {
     console.warn("Supabase environment variables are not set. Using dummy client.")
     return {
@@ -84,7 +83,7 @@ export const createClient = cache(() => {
   }
 
   return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-})
+}
 
 // Добавляем альтернативный экспорт для совместимости
 export const createServerClient = createClient

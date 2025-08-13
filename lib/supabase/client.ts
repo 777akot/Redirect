@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
 // Check if Supabase environment variables are available
 export const isSupabaseConfigured =
@@ -7,9 +7,9 @@ export const isSupabaseConfigured =
   typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "string" &&
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 0
 
-export const supabase = isSupabaseConfigured
-  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-  : {
+export function createClient() {
+  if (!isSupabaseConfigured) {
+    return {
       auth: {
         signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
         signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
@@ -23,3 +23,9 @@ export const supabase = isSupabaseConfigured
         delete: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
       }),
     }
+  }
+
+  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+}
+
+export const supabase = createClient()

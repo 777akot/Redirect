@@ -1,46 +1,48 @@
 "use client"
 
-import { useActionState } from "react"
-import { useFormStatus } from "react-dom"
+import type React from "react"
+
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { signIn } from "@/lib/actions"
-
-function SubmitButton() {
-  const { pending } = useFormStatus()
-
-  return (
-    <Button
-      type="submit"
-      disabled={pending}
-      className="w-full bg-[#2b725e] hover:bg-[#235e4c] text-white py-6 text-lg font-medium rounded-lg h-[60px]"
-    >
-      {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Signing in...
-        </>
-      ) : (
-        "Sign In"
-      )}
-    </Button>
-  )
-}
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginForm() {
   const router = useRouter()
-  const [state, formAction] = useActionState(signIn, null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const supabase = createClient()
 
-  // Handle successful login by redirecting
-  useEffect(() => {
-    if (state?.success) {
-      router.push("/")
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        setError(error.message)
+      } else {
+        router.push("/dashboard")
+        router.refresh()
+      }
+    } catch (err) {
+      setError("An unexpected error occurred")
+    } finally {
+      setLoading(false)
     }
-  }, [state, router])
+  }
 
   return (
     <div className="w-full max-w-md space-y-8">
@@ -49,10 +51,8 @@ export default function LoginForm() {
         <p className="text-lg text-gray-400">Sign in to your account</p>
       </div>
 
-      <form action={formAction} className="space-y-6">
-        {state?.error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-700 px-4 py-3 rounded">{state.error}</div>
-        )}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {error && <div className="bg-red-500/10 border border-red-500/50 text-red-700 px-4 py-3 rounded">{error}</div>}
 
         <div className="space-y-4">
           <div className="space-y-2">
@@ -82,7 +82,20 @@ export default function LoginForm() {
           </div>
         </div>
 
-        <SubmitButton />
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-[#2b725e] hover:bg-[#235e4c] text-white py-6 text-lg font-medium rounded-lg h-[60px]"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Signing in...
+            </>
+          ) : (
+            "Sign In"
+          )}
+        </Button>
 
         <div className="text-center text-gray-400">
           Don't have an account?{" "}
