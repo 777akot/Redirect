@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Plus, Trash2 } from "lucide-react"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase/client"
 
 interface Endpoint {
   path: string
@@ -40,42 +39,21 @@ export default function ApiForm() {
     setLoading(true)
 
     try {
-      // Get current user
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const response = await fetch("/api/apis", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          formData,
+          endpoints: endpoints.filter((ep) => ep.path && ep.method),
+        }),
+      })
 
-      if (!user) {
-        router.push("/auth/login")
-        return
-      }
+      const result = await response.json()
 
-      // Create API
-      const { data: api, error: apiError } = await supabase
-        .from("apis")
-        .insert({
-          ...formData,
-          price_per_request: Number.parseFloat(formData.price_per_request),
-          rate_limit: Number.parseInt(formData.rate_limit),
-          owner_id: user.id,
-        })
-        .select()
-        .single()
-
-      if (apiError) throw apiError
-
-      // Create endpoints
-      if (endpoints.some((ep) => ep.path && ep.method)) {
-        const validEndpoints = endpoints
-          .filter((ep) => ep.path && ep.method)
-          .map((ep) => ({
-            ...ep,
-            api_id: api.id,
-          }))
-
-        const { error: endpointsError } = await supabase.from("api_endpoints").insert(validEndpoints)
-
-        if (endpointsError) throw endpointsError
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to create API")
       }
 
       router.push("/dashboard")

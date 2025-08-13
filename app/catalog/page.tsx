@@ -1,4 +1,4 @@
-import { createClient, isSupabaseConfigured } from "@/lib/supabase/server"
+import { createClient, isSupabaseConfigured, ensureTablesExist } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -27,8 +27,134 @@ export default async function CatalogPage({
 
   const supabase = createClient()
 
-  // Build query with filters
-  let query = supabase.from("apis").select("*").eq("status", "active")
+  // Check if tables exist
+  const { data: tableCheck, error: tableError } = await supabase.from("apis").select("id").limit(1)
+
+  // If tables don't exist, show initialization button
+  if (tableError && tableError.message.includes("does not exist")) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b">
+          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+            <Link href="/" className="flex items-center space-x-2">
+              <Zap className="h-8 w-8 text-primary" />
+              <span className="text-2xl font-bold">API Gateway</span>
+            </Link>
+            <div className="flex items-center space-x-4">
+              <Link href="/auth/login">
+                <Button variant="ghost">Войти</Button>
+              </Link>
+              <Link href="/auth/sign-up">
+                <Button>Регистрация</Button>
+              </Link>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex min-h-[80vh] items-center justify-center">
+          <div className="text-center max-w-md">
+            <h1 className="text-3xl font-bold mb-4">База данных не инициализирована</h1>
+            <p className="text-muted-foreground mb-6">
+              Нажмите кнопку ниже, чтобы создать таблицы и добавить тестовые API
+            </p>
+            <form action="/api/init-db" method="POST">
+              <Button type="submit" size="lg" className="w-full">
+                Инициализировать базу данных
+              </Button>
+            </form>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  await ensureTablesExist()
+
+  const { data: existingApis, error: countError } = await supabase
+    .from("apis")
+    .select("id", { count: "exact" })
+    .limit(1)
+
+  if (!countError && (!existingApis || existingApis.length === 0)) {
+    const sampleApis = [
+      {
+        name: "OpenWeatherMap",
+        description: "Получайте актуальные данные о погоде, прогнозы и исторические данные для любой точки мира",
+        category: "weather",
+        base_url: "https://api.openweathermap.org/data/2.5",
+        pricing_model: "freemium",
+        monthly_price: 0,
+        requests_limit: 1000,
+        auth_type: "api_key",
+        documentation_url: "https://openweathermap.org/api",
+        is_active: true,
+      },
+      {
+        name: "OpenAI GPT-4",
+        description: "Мощная языковая модель для генерации текста, ответов на вопросы и решения сложных задач",
+        category: "ai",
+        base_url: "https://api.openai.com/v1",
+        pricing_model: "pay_per_use",
+        monthly_price: 20,
+        requests_limit: 10000,
+        auth_type: "bearer_token",
+        documentation_url: "https://platform.openai.com/docs",
+        is_active: true,
+      },
+      {
+        name: "CoinGecko",
+        description: "Данные о криптовалютах, ценах, рыночной капитализации и трендах",
+        category: "finance",
+        base_url: "https://api.coingecko.com/api/v3",
+        pricing_model: "freemium",
+        monthly_price: 0,
+        requests_limit: 500,
+        auth_type: "none",
+        documentation_url: "https://www.coingecko.com/en/api",
+        is_active: true,
+      },
+      {
+        name: "Twilio",
+        description: "Отправка SMS, голосовые вызовы и другие коммуникационные сервисы",
+        category: "communication",
+        base_url: "https://api.twilio.com/2010-04-01",
+        pricing_model: "pay_per_use",
+        monthly_price: 0,
+        requests_limit: 100,
+        auth_type: "basic_auth",
+        documentation_url: "https://www.twilio.com/docs",
+        is_active: true,
+      },
+      {
+        name: "REST Countries",
+        description: "Получайте информацию о странах мира: население, столицы, валюты, языки",
+        category: "data",
+        base_url: "https://restcountries.com/v3.1",
+        pricing_model: "free",
+        monthly_price: 0,
+        requests_limit: 1000,
+        auth_type: "none",
+        documentation_url: "https://restcountries.com",
+        is_active: true,
+      },
+      {
+        name: "Alpha Vantage",
+        description: "Финансовые данные: котировки акций, валютные курсы, экономические индикаторы",
+        category: "finance",
+        base_url: "https://www.alphavantage.co/query",
+        pricing_model: "freemium",
+        monthly_price: 0,
+        requests_limit: 500,
+        auth_type: "api_key",
+        documentation_url: "https://www.alphavantage.co/documentation",
+        is_active: true,
+      },
+    ]
+
+    await supabase.from("apis").insert(sampleApis)
+  }
+
+  let query = supabase.from("apis").select("*").eq("is_active", true)
 
   if (searchParams.category && searchParams.category !== "all") {
     query = query.eq("category", searchParams.category)
@@ -44,7 +170,7 @@ export default async function CatalogPage({
   const { data: categories } = await supabase
     .from("apis")
     .select("category")
-    .eq("status", "active")
+    .eq("is_active", true)
     .not("category", "is", null)
 
   const uniqueCategories = [...new Set(categories?.map((item) => item.category) || [])]
@@ -136,6 +262,14 @@ export default async function CatalogPage({
                       <Badge variant="outline" className="text-xs">
                         {api.auth_type === "none" ? "Не требуется" : api.auth_type.toUpperCase()}
                       </Badge>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Цена в месяц:</span>
+                      <span className="font-semibold">${api.monthly_price}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Лимит запросов:</span>
+                      <span>{api.requests_limit}</span>
                     </div>
                     <div className="pt-2 space-y-2">
                       <Link href={`/catalog/${api.id}`}>

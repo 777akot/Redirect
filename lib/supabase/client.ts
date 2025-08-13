@@ -1,4 +1,4 @@
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@supabase/supabase-js"
 
 // Check if Supabase environment variables are available
 export const isSupabaseConfigured =
@@ -7,5 +7,19 @@ export const isSupabaseConfigured =
   typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "string" &&
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 0
 
-// Create a singleton instance of the Supabase client for Client Components
-export const supabase = createClientComponentClient()
+export const supabase = isSupabaseConfigured
+  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  : {
+      auth: {
+        signInWithPassword: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        signUp: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        signOut: () => Promise.resolve({ error: null }),
+        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+      },
+      from: () => ({
+        select: () => Promise.resolve({ data: [], error: null }),
+        insert: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        update: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+        delete: () => Promise.resolve({ data: null, error: { message: "Supabase not configured" } }),
+      }),
+    }

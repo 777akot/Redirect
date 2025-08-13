@@ -1,12 +1,9 @@
 "use server"
 
-import { createServerActionClient } from "@supabase/auth-helpers-nextjs"
-import { cookies, headers } from "next/headers"
+import { createClient } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 
-// Update the signIn function to handle redirects properly
 export async function signIn(prevState: any, formData: FormData) {
-  // Check if formData is valid
   if (!formData) {
     return { error: "Form data is missing" }
   }
@@ -14,13 +11,11 @@ export async function signIn(prevState: any, formData: FormData) {
   const email = formData.get("email")
   const password = formData.get("password")
 
-  // Validate required fields
   if (!email || !password) {
     return { error: "Email and password are required" }
   }
 
-  const cookieStore = cookies()
-  const supabase = createServerActionClient({ cookies: () => cookieStore })
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
   try {
     const { error } = await supabase.auth.signInWithPassword({
@@ -32,7 +27,6 @@ export async function signIn(prevState: any, formData: FormData) {
       return { error: error.message }
     }
 
-    // Return success instead of redirecting directly
     return { success: true }
   } catch (error) {
     console.error("Login error:", error)
@@ -41,7 +35,6 @@ export async function signIn(prevState: any, formData: FormData) {
 }
 
 export async function signUp(prevState: any, formData: FormData) {
-  // Check if formData is valid
   if (!formData) {
     return { error: "Form data is missing" }
   }
@@ -49,35 +42,30 @@ export async function signUp(prevState: any, formData: FormData) {
   const email = formData.get("email")
   const password = formData.get("password")
 
-  // Validate required fields
   if (!email || !password) {
     return { error: "Email and password are required" }
   }
 
-  const cookieStore = cookies()
-  const supabase = createServerActionClient({ cookies: () => cookieStore })
-
-  // Get the current origin from headers for proper redirect URL
-  const headersList = headers()
-  const origin = headersList.get("origin") || headersList.get("host")
-  const redirectUrl =
-    process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
-    (origin ? `${origin.startsWith("http") ? origin : `https://${origin}`}` : "https://your-domain.vercel.app")
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
   try {
     const { error } = await supabase.auth.signUp({
       email: email.toString(),
       password: password.toString(),
-      options: {
-        emailRedirectTo: redirectUrl,
-      },
+      options: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL
+        ? {
+            emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL,
+          }
+        : undefined,
     })
 
     if (error) {
       return { error: error.message }
     }
 
-    return { success: "Check your email to confirm your account." }
+    return {
+      success: "Account created successfully! Check your email to confirm your account.",
+    }
   } catch (error) {
     console.error("Sign up error:", error)
     return { error: "An unexpected error occurred. Please try again." }
@@ -85,8 +73,7 @@ export async function signUp(prevState: any, formData: FormData) {
 }
 
 export async function signOut() {
-  const cookieStore = cookies()
-  const supabase = createServerActionClient({ cookies: () => cookieStore })
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
   await supabase.auth.signOut()
   redirect("/auth/login")
